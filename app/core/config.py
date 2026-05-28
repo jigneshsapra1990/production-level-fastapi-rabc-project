@@ -1,9 +1,17 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
     APP_NAME: str = "FastAPI RBAC"
     DEBUG: bool = False
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, v):
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes")
+        return v
 
     DATABASE_URL: str
     SECRET_KEY: str
