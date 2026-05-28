@@ -1,28 +1,21 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, HTTPException
+from app.schemas.user import LoginSchema, TokenResponse
 from app.services.auth_service import AuthService
-from app.repositories.user_repository import UserRepository
-from app.db.database import get_db
-from app.api.deps import role_required
-from pydantic import BaseModel
+from app.api.deps import get_auth_service, role_required
+from app.utils.response import success_response
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-class LoginSchema(BaseModel):
-    email: str
-    password: str
-
-
-def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
-    return AuthService(UserRepository(db))
-
-
-@router.post("/login")
+@router.post("/login", response_model=dict)
 async def login(payload: LoginSchema, service: AuthService = Depends(get_auth_service)):
-    return await service.login(payload.email, payload.password)
+    try:
+        token = await service.login(payload.email, payload.password)
+        return success_response("Login successful", token)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
 
 
-@router.get("/admin-only")
-async def admin_route(user=Depends(role_required(["Admin"]))):
-    return {"message": "Welcome Admin"}
+@router.get("/admin-only", dependencies=[Depends(role_required(["Admin"]))])
+async def admin_route():
+    return success_response("Welcome Admin")
