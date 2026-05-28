@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.user import User
 from app.core.security import hash_password
-from app.db import get_db
+from app.db.database import get_db
 
 router = APIRouter(prefix="/users", tags=["users"])
 
