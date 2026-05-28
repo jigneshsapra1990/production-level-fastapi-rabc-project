@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from app.models.user import User
-from app.core.security import verify_password
-from app.auth.jwt import create_access_token
+from app.services.auth_service import AuthService
+from app.repositories.user_repository import UserRepository
 from app.db.database import get_db
 from app.api.deps import role_required
 from pydantic import BaseModel
@@ -16,15 +14,13 @@ class LoginSchema(BaseModel):
     password: str
 
 
-@router.post("/login")
-async def login(payload: LoginSchema, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == payload.email))
-    user = result.scalars().one_or_none()
-    if not user or not verify_password(payload.password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
+    return AuthService(UserRepository(db))
 
-    access_token = create_access_token(data={"sub": str(user.id), "role_id": str(user.role_id)})
-    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/login")
+async def login(payload: LoginSchema, service: AuthService = Depends(get_auth_service)):
+    return await service.login(payload.email, payload.password)
 
 
 @router.get("/admin-only")

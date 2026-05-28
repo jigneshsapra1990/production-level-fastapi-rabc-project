@@ -1,27 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
-from app.schemas.user import UserResponse, UserCreate
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from app.models.user import User
-from app.core.security import hash_password
+from app.schemas.user import UserResponse, UserCreate
+from app.services.user_service import UserService
+from app.repositories.user_repository import UserRepository
 from app.db.database import get_db
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.post("/", response_model=UserResponse)
-async def create_user(payload: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == payload.email))
-    if result.scalars().one_or_none():
-        raise HTTPException(status_code=400, detail="Email already registered")
+def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
+    return UserService(UserRepository(db))
 
-    user = User(
-        username=payload.username,
-        email=payload.email,
-        password=hash_password(payload.password),
-        role_id=payload.role_id,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
+
+@router.post("/", response_model=UserResponse)
+async def create_user(payload: UserCreate, service: UserService = Depends(get_user_service)):
+    return await service.register(payload)
